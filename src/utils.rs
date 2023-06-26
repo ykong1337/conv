@@ -1,45 +1,90 @@
-use std::{env, fs::File, io::{BufRead, BufReader, Write}};
-use std::path::{Path, PathBuf};
+use std::{fs, fs::File, io::Write, thread};
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use tokio::runtime::Runtime;
+use whisper_cli::{Language, Model, Size, Transcript, Whisper};
 
-fn is_number(s: &str) -> bool {
-    s.chars().all(|c| c.is_digit(10))
+pub static WHISPER: AtomicBool = AtomicBool::new(false);
+pub static MERGE: AtomicBool = AtomicBool::new(false);
+
+fn as_lrc(t: &Transcript) -> String {
+    t.word_utterances
+        .as_ref()
+        .unwrap_or(&t.utterances)
+        .iter()
+        .fold(String::new(), |lrc, fragment| {
+            lrc +
+                format!(
+                    "[{:02}:{:02}.{:02}]{}\n",
+                    fragment.start / 100 / 60,
+                    fragment.start / 100,
+                    fragment.start % 100,
+                    fragment.text
+                )
+                    .as_str()
+        })
 }
 
-// 将srt时间格式转换为lrc时间格式
-fn format_time(time: &str) -> String {
-    let msec = &time[9..12];
-    let sec = &time[6..8];
-    let min = &time[3..5];
-
-    format!("[{}:{}.{:.2}]", min, sec, msec)
-}
-
-fn srt2lrc(path: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let output_filename = Path::new(path).with_extension("lrc");
-
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let lines = reader.lines().filter_map(|l| l.ok());
-
-    let lrc_content = lines.fold(String::new(), |lrc, line| {
-        if is_number(&line) {
-            // 行号
-            lrc
-        } else if line.is_empty() {
-            // 空行
-            lrc
-        } else {
-            // 时间和文本内容
-            let time = line.split_whitespace().nth(0).unwrap();
-            let text = line.splitn(2, char::is_whitespace).nth(1).unwrap();
-
-            let lrc_time = format_time(time);
-            format!("{}{}\n", lrc, lrc_time + " " + text)
+pub fn whisper(rt: Arc<Runtime>, path: PathBuf, lang: Language, size: Size) {
+    rt.spawn(async move {
+        WHISPER.store(true, Ordering::Relaxed);
+        let mut w = Whisper::new(Model::new(size), Some(lang)).await;
+        if let Ok(ref t) = w.transcribe(&path, false, false) {
+            let lrc = as_lrc(t);
+            let srt = t.as_srt();
+            let path_lrc = path.with_extension("lrc");
+            let path_srt = path.with_extension("srt");
+            let mut file = File::create(path_lrc).unwrap();
+            file.write_all(lrc.as_bytes()).unwrap();
+            let mut file = File::create(path_srt).unwrap();
+            file.write_all(srt.as_bytes()).unwrap();
         }
+        WHISPER.store(false, Ordering::Relaxed);
     });
+}
 
-    let mut output_file = File::create(output_filename)?;
-    output_file.write_all(lrc_content.as_bytes())?;
+pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Option<PathBuf>) {
+    thread::spawn(move || {
+        MERGE.store(true, Ordering::Relaxed);
+        let mut cmd = Command::new("ffmpeg");
+        if let Some(ref image) = image {
+            cmd.args([
+                "-loop",
+                "1",
+                "-i",
+                image.to_str().unwrap(),
+            ]);
+        }
+        if let (Some(ref audio), Some(ref subtitle)) = (audio, subtitle) {
+            let output = audio.with_extension("mp4");
+            if output.exists() {
+                fs::remove_file(output).unwrap_or(());
+            }
+            cmd.args([
+                "-i",
+                audio.to_str().unwrap(),
+                "-vf",
+                &format!("subtitles={}", subtitle.file_name().unwrap().to_str().unwrap()),
+                // "-c:v",
+                // "copy",
+                // "-c:a",
+                // "copy",
+                "-shortest",
+                audio.with_extension("mp4").to_str().unwrap(),
+            ]);
+        } else {
+            MERGE.store(false, Ordering::Relaxed);
+            return;
+        }
+        if let Ok(mut c) = cmd.spawn() {
+            if c.wait().is_err() {
+                MERGE.store(false, Ordering::Relaxed);
+                return;
+            }
+        }
 
-    Ok(())
+        MERGE.store(false, Ordering::Relaxed);
+    });
 }
