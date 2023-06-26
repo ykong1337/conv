@@ -17,13 +17,18 @@ fn as_lrc(t: &Transcript) -> String {
         .fold(String::new(), |lrc, fragment| {
             lrc +
                 format!(
+                    "[{:02}:{:02}.{:02}]\n",
+                    fragment.start / 100 / 60,
+                    fragment.start / 100,
+                    fragment.start % 100,
+                ).as_str() +
+                format!(
                     "[{:02}:{:02}.{:02}]{}\n",
                     fragment.start / 100 / 60,
                     fragment.start / 100,
                     fragment.start % 100,
                     fragment.text
-                )
-                    .as_str()
+                ).as_str()
         })
 }
 
@@ -53,6 +58,7 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
             cmd.args([
                 "-loop",
                 "1",
+                "-y",
                 "-i",
                 image.to_str().unwrap(),
             ]);
@@ -60,19 +66,15 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
         if let (Some(ref audio), Some(ref subtitle)) = (audio, subtitle) {
             let output = audio.with_extension("mp4");
             if output.exists() {
-                fs::remove_file(output).unwrap_or(());
+                fs::remove_file(&output).unwrap_or(());
             }
             cmd.args([
                 "-i",
                 audio.to_str().unwrap(),
                 "-vf",
-                &format!("subtitles={}", subtitle.file_name().unwrap().to_str().unwrap()),
-                // "-c:v",
-                // "copy",
-                // "-c:a",
-                // "copy",
+                &format!("subtitles={}", subtitle.to_str().unwrap()),
                 "-shortest",
-                audio.with_extension("mp4").to_str().unwrap(),
+                output.to_str().unwrap(),
             ]);
         } else {
             MERGE.store(false, Ordering::Relaxed);

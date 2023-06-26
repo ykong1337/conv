@@ -28,8 +28,8 @@ struct Config {
 #[derive(Debug, Clone, Default)]
 pub struct Files {
     pub audio: Option<PathBuf>,
-    image: Option<PathBuf>,
-    subtitle: Option<PathBuf>,
+    pub image: Option<PathBuf>,
+    pub subtitle: Option<PathBuf>,
 }
 
 impl Conv {
