@@ -54,25 +54,18 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
     thread::spawn(move || {
         MERGE.store(true, Ordering::Relaxed);
         let mut cmd = Command::new("ffmpeg");
-        if let Some(ref image) = image {
+        if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
+            let output = audio.with_extension("mp4");
             cmd.args([
                 "-loop",
                 "1",
-                "-y",
                 "-i",
                 image.to_str().unwrap(),
-            ]);
-        }
-        if let (Some(ref audio), Some(ref subtitle)) = (audio, subtitle) {
-            let output = audio.with_extension("mp4");
-            if output.exists() {
-                fs::remove_file(&output).unwrap_or(());
-            }
-            cmd.args([
                 "-i",
                 audio.to_str().unwrap(),
                 "-vf",
-                &format!("subtitles={}", subtitle.to_str().unwrap()),
+                &format!("subtitles={}", subtitle.file_name().unwrap().to_str().unwrap()),
+                "-y",
                 "-shortest",
                 output.to_str().unwrap(),
             ]);
@@ -86,7 +79,6 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
                 return;
             }
         }
-
         MERGE.store(false, Ordering::Relaxed);
     });
 }
