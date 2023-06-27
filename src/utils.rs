@@ -1,4 +1,4 @@
-use std::{fs, fs::File, io::Write, thread};
+use std::{fs::File, io::Write, thread};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
