@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, thread};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Child, Command};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::runtime::Runtime;
@@ -55,43 +55,15 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
         MERGE.store(true, Ordering::Relaxed);
         if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
             let output = audio.with_extension("mp4");
-            let temp = audio.with_file_name("temp").with_extension("mp4");
             let output = output.to_str().unwrap();
+            let temp = audio.with_file_name("temp").with_extension("mp4");
             let temp = temp.to_str().unwrap();
-            let mut audio_image = Command::new("ffmpeg");
-            audio_image.args([
-                "-loop",
-                "1",
-                "-i",
-                image.to_str().unwrap(),
-                "-i",
-                audio.to_str().unwrap(),
-                "-c:v",
-                "libx264",
-                "-c:a",
-                "aac",
-                "-b:a",
-                "192k",
-                "-y",
-                "-shortest",
-                temp,
-            ]);
-            let mut vf_mp4 = Command::new("ffmpeg");
-            vf_mp4.args([
-                "-i",
-                temp,
-                "-vf",
-                &format!("subtitles={}", subtitle.file_name().unwrap().to_str().unwrap()),
-                "-c:a",
-                "copy",
-                "-y",
-                output,
-            ]);
-            if audio_image.spawn().unwrap().wait().is_err() {
+
+            if merge(audio.to_str().unwrap(), image.to_str().unwrap(), temp).wait().is_err() {
                 MERGE.store(false, Ordering::Relaxed);
                 return;
             }
-            if vf_mp4.spawn().unwrap().wait().is_err() {
+            if to_mp4(subtitle.file_name().unwrap().to_str().unwrap(), output, temp).wait().is_err() {
                 MERGE.store(false, Ordering::Relaxed);
                 return;
             }
@@ -102,4 +74,43 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
 
         MERGE.store(false, Ordering::Relaxed);
     });
+}
+
+fn merge(audio: &str, image: &str, temp: &str) -> Child {
+    Command::new("ffmpeg")
+        .args([
+            "-loop",
+            "1",
+            "-i",
+            image,
+            "-i",
+            audio,
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "192k",
+            "-y",
+            "-shortest",
+            temp,
+        ])
+        .spawn()
+        .unwrap()
+}
+
+fn to_mp4(subtitle: &str, output: &str, temp: &str) -> Child {
+    Command::new("ffmpeg")
+        .args([
+            "-i",
+            temp,
+            "-vf",
+            &format!("subtitles={}", subtitle),
+            "-c:a",
+            "copy",
+            "-y",
+            output,
+        ])
+        .spawn()
+        .unwrap()
 }

@@ -72,7 +72,7 @@ impl Conv {
     fn open_image(files: Arc<Mutex<Files>>) {
         thread::spawn(move || {
             if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Image File", &["jpg", "png"])
+                .add_filter("Image File", &["jpg"])
                 .pick_file() {
                 files.lock().unwrap().image = Some(path);
             }
