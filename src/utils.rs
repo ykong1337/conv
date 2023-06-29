@@ -91,6 +91,8 @@ fn merge(audio: &str, image: &str, temp: &str) -> Child {
             "aac",
             "-b:a",
             "192k",
+            "-pix_fmt",
+            "yuv420p",
             "-y",
             "-shortest",
             temp,
