@@ -55,15 +55,13 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
         MERGE.store(true, Ordering::Relaxed);
         if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
             let output = audio.with_extension("mp4");
-            let output = output.to_str().unwrap();
-            let temp = audio.with_file_name("temp").with_extension("mp4");
-            let temp = temp.to_str().unwrap();
 
-            if merge(audio.to_str().unwrap(), image.to_str().unwrap(), temp).wait().is_err() {
-                MERGE.store(false, Ordering::Relaxed);
-                return;
-            }
-            if to_mp4(subtitle.file_name().unwrap().to_str().unwrap(), output, temp).wait().is_err() {
+            if merge(
+                audio.to_str().unwrap(),
+                image.to_str().unwrap(),
+                subtitle.file_name().unwrap().to_str().unwrap(),
+                output.to_str().unwrap(),
+            ).wait().is_err() {
                 MERGE.store(false, Ordering::Relaxed);
                 return;
             }
@@ -76,7 +74,7 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
     });
 }
 
-fn merge(audio: &str, image: &str, temp: &str) -> Child {
+fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> Child {
     Command::new("ffmpeg")
         .args([
             "-loop",
@@ -85,6 +83,8 @@ fn merge(audio: &str, image: &str, temp: &str) -> Child {
             image,
             "-i",
             audio,
+            "-vf",
+            &format!("subtitles={}", subtitle),
             "-c:v",
             "libx264",
             "-c:a",
@@ -95,22 +95,6 @@ fn merge(audio: &str, image: &str, temp: &str) -> Child {
             "yuv420p",
             "-y",
             "-shortest",
-            temp,
-        ])
-        .spawn()
-        .unwrap()
-}
-
-fn to_mp4(subtitle: &str, output: &str, temp: &str) -> Child {
-    Command::new("ffmpeg")
-        .args([
-            "-i",
-            temp,
-            "-vf",
-            &format!("subtitles={}", subtitle),
-            "-c:a",
-            "copy",
-            "-y",
             output,
         ])
         .spawn()
