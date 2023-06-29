@@ -19,13 +19,13 @@ fn as_lrc(t: &Transcript) -> String {
                 format!(
                     "[{:02}:{:02}.{:02}]\n",
                     fragment.start / 100 / 60,
-                    fragment.start / 100,
+                    fragment.start / 100 % 60,
                     fragment.start % 100,
                 ).as_str() +
                 format!(
                     "[{:02}:{:02}.{:02}]{}\n",
                     fragment.start / 100 / 60,
-                    fragment.start / 100,
+                    fragment.start / 100 % 60,
                     fragment.start % 100,
                     fragment.text
                 ).as_str()
@@ -53,32 +53,53 @@ pub fn whisper(rt: Arc<Runtime>, path: PathBuf, lang: Language, size: Size) {
 pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Option<PathBuf>) {
     thread::spawn(move || {
         MERGE.store(true, Ordering::Relaxed);
-        let mut cmd = Command::new("ffmpeg");
         if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
             let output = audio.with_extension("mp4");
-            cmd.args([
+            let temp = audio.with_file_name("temp").with_extension("mp4");
+            let output = output.to_str().unwrap();
+            let temp = temp.to_str().unwrap();
+            let mut audio_image = Command::new("ffmpeg");
+            audio_image.args([
                 "-loop",
                 "1",
                 "-i",
                 image.to_str().unwrap(),
                 "-i",
                 audio.to_str().unwrap(),
-                "-vf",
-                &format!("subtitles={}", subtitle.file_name().unwrap().to_str().unwrap()),
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
                 "-y",
                 "-shortest",
-                output.to_str().unwrap(),
+                temp,
             ]);
+            let mut vf_mp4 = Command::new("ffmpeg");
+            vf_mp4.args([
+                "-i",
+                temp,
+                "-vf",
+                &format!("subtitles={}", subtitle.file_name().unwrap().to_str().unwrap()),
+                "-c:a",
+                "copy",
+                "-y",
+                output,
+            ]);
+            if audio_image.spawn().unwrap().wait().is_err() {
+                MERGE.store(false, Ordering::Relaxed);
+                return;
+            }
+            if vf_mp4.spawn().unwrap().wait().is_err() {
+                MERGE.store(false, Ordering::Relaxed);
+                return;
+            }
         } else {
             MERGE.store(false, Ordering::Relaxed);
             return;
         }
-        if let Ok(mut c) = cmd.spawn() {
-            if c.wait().is_err() {
-                MERGE.store(false, Ordering::Relaxed);
-                return;
-            }
-        }
+
         MERGE.store(false, Ordering::Relaxed);
     });
 }
