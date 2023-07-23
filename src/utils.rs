@@ -74,7 +74,9 @@ pub fn ffmpeg_merge(rt: Arc<Runtime>, audio: Option<PathBuf>, image: Option<Path
                 MERGE.store(false, Ordering::Relaxed);
                 return;
             }
-            std::fs::remove_file(current.join(subtitle_name)).unwrap();
+            if std::fs::remove_file(current.join(subtitle_name)).is_err() {
+                return;
+            }
         } else {
             MERGE.store(false, Ordering::Relaxed);
             return;
