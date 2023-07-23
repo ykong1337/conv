@@ -12,7 +12,7 @@ Scoop:
 scoop install ffmpeg
 ```
 
-运行conv.exe(请把字幕文件和conv.exe放在同一目录下)
+运行conv.exe
 
 ### 构建
 安装
