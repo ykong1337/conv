@@ -72,7 +72,7 @@ impl Conv {
     fn open_image(files: Arc<Mutex<Files>>) {
         thread::spawn(move || {
             if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Image File", &["jpg"])
+                .add_filter("Image File", &["jpg", "png"])
                 .pick_file() {
                 files.lock().unwrap().image = Some(path);
             }
@@ -156,7 +156,7 @@ impl eframe::App for Conv {
             if ui.button("合并音频/图片/字幕").clicked() {
                 if !MERGE.load(Ordering::Relaxed) {
                     let file = self.files.lock().unwrap();
-                    ffmpeg_merge(file.audio.clone(), file.image.clone(), file.subtitle.clone());
+                    ffmpeg_merge(self.rt.clone(), file.audio.clone(), file.image.clone(), file.subtitle.clone());
                 }
             }
             ui.label(if MERGE.load(Ordering::Relaxed) { "合并中" } else { "合并结束" });

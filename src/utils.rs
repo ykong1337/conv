@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write, thread};
+use std::{fs::File, io::Write};
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Arc;
@@ -50,21 +50,31 @@ pub fn whisper(rt: Arc<Runtime>, path: PathBuf, lang: Language, size: Size) {
     });
 }
 
-pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Option<PathBuf>) {
-    thread::spawn(move || {
+pub fn ffmpeg_merge(rt: Arc<Runtime>, audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Option<PathBuf>) {
+    rt.spawn(async move {
         MERGE.store(true, Ordering::Relaxed);
         if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
+            let current = std::env::current_dir().unwrap();
+            let subtitle_name = subtitle
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap();
+            if !current.join(subtitle_name).exists() {
+                std::fs::copy(subtitle, current.join(subtitle_name)).unwrap();
+            }
             let output = audio.with_extension("mp4");
 
             if merge(
                 audio.to_str().unwrap(),
                 image.to_str().unwrap(),
-                subtitle.file_name().unwrap().to_str().unwrap(),
+                subtitle_name,
                 output.to_str().unwrap(),
             ).wait().is_err() {
                 MERGE.store(false, Ordering::Relaxed);
                 return;
             }
+            std::fs::remove_file(current.join(subtitle_name)).unwrap();
         } else {
             MERGE.store(false, Ordering::Relaxed);
             return;
@@ -77,6 +87,7 @@ pub fn ffmpeg_merge(audio: Option<PathBuf>, image: Option<PathBuf>, subtitle: Op
 fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> Child {
     Command::new("ffmpeg")
         .args([
+            "-y",
             "-loop",
             "1",
             "-i",
@@ -87,13 +98,14 @@ fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> Child {
             &format!("subtitles={}", subtitle),
             "-c:v",
             "libx264",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
+            "-c:a:1",
+            "copy",
+            "-c:a:2",
+            "copy",
+            "-c:a:3",
+            "copy",
             "-pix_fmt",
             "yuv420p",
-            "-y",
             "-shortest",
             output,
         ])
