@@ -187,10 +187,10 @@ impl Transcript {
                         "{:02}:{:02}.{:03} --> {:02}:{:02}.{:03}\n- {}\n\n",
                         fragment.start / 100 / 60,
                         fragment.start / 100 % 60,
-                        fragment.start * 10 % 100,
+                        fragment.start * 10 % 1000,
                         fragment.end / 100 / 60,
                         fragment.end / 100 % 60,
-                        fragment.end * 10 % 100,
+                        fragment.end * 10 % 1000,
                         fragment.text.trim()
                     )
             })
