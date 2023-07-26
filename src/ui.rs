@@ -9,19 +9,19 @@ use egui::TextStyle::*;
 use tokio::runtime::Runtime;
 use whisper_cli::{Language, Size};
 use crate::font::load_fonts;
-use crate::utils::{ffmpeg_merge, MERGE, WHISPER, whisper};
+use crate::utils::{MERGE, WHISPER};
 
 #[derive(Clone)]
 pub struct Conv {
-    rt: Arc<Runtime>,
-    files: Arc<Mutex<Files>>,
-    config: Config,
+    pub rt: Arc<Runtime>,
+    pub files: Arc<Mutex<Files>>,
+    pub config: Config,
 }
 
 #[derive(Clone)]
-struct Config {
-    lang: Language,
-    size: Size,
+pub struct Config {
+    pub lang: Language,
+    pub size: Size,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -57,36 +57,6 @@ impl Conv {
             files: Default::default(),
             config: Config { lang: Language::Auto, size: Size::Medium },
         })
-    }
-
-    fn open_audio(&self, files: Arc<Mutex<Files>>) {
-        self.rt.spawn(async move {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Audio File", &["mp3", "wav"])
-                .pick_file() {
-                files.lock().unwrap().audio = Some(path);
-            }
-        });
-    }
-
-    fn open_image(&self, files: Arc<Mutex<Files>>) {
-        self.rt.spawn(async move {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Image File", &["jpg", "png"])
-                .pick_file() {
-                files.lock().unwrap().image = Some(path);
-            }
-        });
-    }
-
-    fn open_subtitle(&self, files: Arc<Mutex<Files>>) {
-        self.rt.spawn(async move {
-            if let Some(path) = rfd::FileDialog::new()
-                .add_filter("Subtitle File", &["srt", "lrc", "vtt"])
-                .pick_file() {
-                files.lock().unwrap().subtitle = Some(path);
-            }
-        });
     }
 }
 
@@ -144,9 +114,7 @@ impl eframe::App for Conv {
 
             if ui.button("音频 -> 字幕").clicked() {
                 if !WHISPER.load(Ordering::Relaxed) {
-                    if let Some(ref path) = self.files.lock().unwrap().audio {
-                        whisper(self.rt.clone(), path.clone(), self.config.lang, self.config.size);
-                    }
+                    self.whisper();
                 }
             }
             ui.label(if WHISPER.load(Ordering::Relaxed) { "转换中" } else { "转换结束" });
@@ -155,8 +123,7 @@ impl eframe::App for Conv {
 
             if ui.button("合并音频/图片/字幕").clicked() {
                 if !MERGE.load(Ordering::Relaxed) {
-                    let file = self.files.lock().unwrap();
-                    ffmpeg_merge(self.rt.clone(), file.audio.clone(), file.image.clone(), file.subtitle.clone());
+                    self.ffmpeg_merge();
                 }
             }
             ui.label(if MERGE.load(Ordering::Relaxed) { "合并中" } else { "合并结束" });
