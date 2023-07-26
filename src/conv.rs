@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
@@ -13,7 +11,7 @@ use tokio::runtime::Runtime;
 use crate::config::{Language, Model};
 use crate::font::load_fonts;
 use crate::utils::{MERGE, merge, WHISPER};
-use crate::whisper::Whisper;
+use crate::whisper::{Format, Whisper};
 
 #[derive(Clone)]
 pub struct Conv {
@@ -98,15 +96,9 @@ impl Conv {
                 if let Ok(ref mut w) = Whisper::new(lang, model).await {
                     WHISPER.store(true, Ordering::Relaxed);
                     if let Ok(ref t) = w.transcribe(audio, false, false) {
-                        let path_lrc = audio.with_extension("lrc");
-                        let mut file = File::create(path_lrc).unwrap();
-                        let lrc = t.to_lrc();
-                        file.write_all(lrc.as_bytes()).unwrap();
-
-                        let path_srt = audio.with_extension("srt");
-                        let mut file = File::create(path_srt).unwrap();
-                        let srt = t.to_srt();
-                        file.write_all(srt.as_bytes()).unwrap();
+                        t.write_file(audio, Format::Lrc);
+                        t.write_file(audio, Format::Srt);
+                        t.write_file(audio, Format::Vtt);
                     }
                 }
             }

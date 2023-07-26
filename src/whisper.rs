@@ -1,4 +1,5 @@
-use std::io::{Error, ErrorKind};
+use std::fs::File;
+use std::io::{Error, ErrorKind, Write};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -110,7 +111,25 @@ impl Whisper {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Format {
+    Lrc,
+    Srt,
+    Vtt,
+}
+
 impl Transcript {
+    pub fn write_file<P: AsRef<Path>>(&self, audio: P, format: Format) {
+        let (path, subtitle) = match format {
+            Format::Lrc => (audio.as_ref().with_extension("lrc"), self.to_lrc()),
+            Format::Srt => (audio.as_ref().with_extension("srt"), self.to_srt()),
+            Format::Vtt => (audio.as_ref().with_extension("vtt"), self.to_vtt()),
+        };
+        if let Ok(mut file) = File::create(path) {
+            file.write_all(subtitle.as_bytes()).unwrap();
+        }
+    }
+
     pub fn to_lrc(&self) -> String {
         self.word_utterances
             .as_ref()
@@ -155,5 +174,25 @@ impl Transcript {
                 )
             })
             .1
+    }
+
+    pub fn to_vtt(&self) -> String {
+        self.word_utterances
+            .as_ref()
+            .unwrap_or(&self.utterances)
+            .iter()
+            .fold(String::from("WEBVTT\n\n"), |vtt, fragment| {
+                vtt +
+                    &format!(
+                        "{:02}:{:02}.{:03} --> {:02}:{:02}.{:03}\n- {}\n\n",
+                        fragment.start / 100 / 60,
+                        fragment.start / 100 % 60,
+                        fragment.start * 10 % 100,
+                        fragment.end / 100 / 60,
+                        fragment.end / 100 % 60,
+                        fragment.end * 10 % 100,
+                        fragment.text.trim()
+                    )
+            })
     }
 }

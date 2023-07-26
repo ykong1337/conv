@@ -41,7 +41,6 @@ pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io:
         .spawn()
 }
 
-
 // ffmpeg -i input.mp3 -ar 16000 output.wav
 fn use_ffmpeg<P: AsRef<Path>>(input_path: P) -> Result<Vec<i16>> {
     let temp_file = temp_dir().join(format!("{}.wav", uuid::Uuid::new_v4()));
