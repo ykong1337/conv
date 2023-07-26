@@ -111,7 +111,7 @@ impl Whisper {
 }
 
 impl Transcript {
-    pub fn as_lrc(&self) -> String {
+    pub fn to_lrc(&self) -> String {
         self.word_utterances
             .as_ref()
             .unwrap_or(&self.utterances)
@@ -123,11 +123,37 @@ impl Transcript {
                         fragment.start / 100 / 60,
                         fragment.start / 100 % 60,
                         fragment.start % 100,
-                        fragment.text,
+                        fragment.text.trim(),
                         fragment.end / 100 / 60,
                         fragment.end / 100 % 60,
                         fragment.end % 100,
                     )
             })
+    }
+
+    pub fn to_srt(&self) -> String {
+        self.word_utterances
+            .as_ref()
+            .unwrap_or(&self.utterances)
+            .iter()
+            .fold((1, String::new()), |(i, srt), fragment| {
+                (
+                    i + 1,
+                    srt +
+                        &format!(
+                            "{i}\n{:02}:{:02}:{:02},{:03} --> {:02}:{:02}:{:02},{:03}\n{}\n\n",
+                            fragment.start / 100 / 3600,
+                            fragment.start / 100 / 60,
+                            fragment.start / 100 % 60,
+                            fragment.start * 10 % 1000,
+                            fragment.end / 100 / 3600,
+                            fragment.end / 100 / 60,
+                            fragment.end / 100 % 60,
+                            fragment.end * 10 % 1000,
+                            fragment.text.trim()
+                        )
+                )
+            })
+            .1
     }
 }

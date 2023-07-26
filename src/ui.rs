@@ -78,8 +78,7 @@ impl eframe::App for Conv {
                 }
             }
             if DOWNLOADING.load(Ordering::Relaxed) {
-                ui.label("下载模型中");
-                ui.add(ProgressBar::new(DOWNLOADED.load(Ordering::Relaxed) as f32 / FILE_SIZE.load(Ordering::Relaxed) as f32).desired_width(200.0));
+                ui.add(ProgressBar::new(DOWNLOADED.load(Ordering::Relaxed) as f32 / FILE_SIZE.load(Ordering::Relaxed) as f32).desired_width(200.0).show_percentage().text("下载模型中"));
             }
             ui.label(if WHISPER.load(Ordering::Relaxed) { "转换中" } else { "转换结束" });
 
