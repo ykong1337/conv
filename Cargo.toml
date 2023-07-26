@@ -12,10 +12,9 @@ egui = "0.22"
 font-kit = "0.11"
 clap_builder = "4"
 tokio = { version = "1", features = ["full"] }
-futures-util = "0.3"
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
-reqwest = { version = "0.11", features = ["stream"] }
+reqwest = "0.11"
 anyhow = "1"
 whisper-rs = "0.8"
 uuid = { version = "1", features = ["v4"] }

@@ -4,9 +4,10 @@ use std::fs::File;
 use std::io::{ErrorKind, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use futures_util::stream::StreamExt;
+
 use once_cell::sync::Lazy;
 use reqwest::Client;
+
 use crate::utils::DOWNLOADING;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, clap::ValueEnum)]
@@ -379,20 +380,19 @@ impl Model {
         }
         DOWNLOADING.store(true, Ordering::Relaxed);
         let mut model = File::create(path)?;
-        let file = CLIENT.get(&format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin", self))
+        let mut file = CLIENT.get(&format!("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-{}.bin", self))
             .send()
             .await
             .map_err(|_| std::io::Error::from(ErrorKind::NotConnected))?;
         FILE_SIZE.store(file.content_length().unwrap(), Ordering::Relaxed);
         DOWNLOADED.store(0, Ordering::Relaxed);
-        let mut stream = file.bytes_stream();
-        while let Some(item) = stream.next().await {
+
+        while let Some(item) = file.chunk().await.map_err(|_| std::io::Error::from(ErrorKind::InvalidData))? {
             if !DOWNLOADING.load(Ordering::Relaxed) {
                 break;
             }
-            let chunk = item.map_err(|_| std::io::Error::from(ErrorKind::InvalidData))?;
-            model.write_all(&chunk)?;
-            let new = min(DOWNLOADED.load(Ordering::Relaxed) + (chunk.len() as u64), FILE_SIZE.load(Ordering::Relaxed));
+            model.write_all(&item)?;
+            let new = min(DOWNLOADED.load(Ordering::Relaxed) + (item.len() as u64), FILE_SIZE.load(Ordering::Relaxed));
             DOWNLOADED.store(new, Ordering::Relaxed);
         }
         DOWNLOADING.store(false, Ordering::Relaxed);
