@@ -2,11 +2,16 @@
 
 use eframe::NativeOptions;
 use egui::Vec2;
-use crate::ui::Conv;
+
+use crate::conv::Conv;
 
 mod ui;
 mod font;
 mod utils;
+mod whisper;
+mod config;
+mod conv;
+mod ffmpeg_decoder;
 
 fn main() {
     run();

@@ -1,64 +1,12 @@
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
+
 use clap_builder::ValueEnum;
-use eframe::{CreationContext, Frame};
-use egui::{ComboBox, Context, FontId};
-use egui::FontFamily::Proportional;
-use egui::TextStyle::*;
-use tokio::runtime::Runtime;
-use whisper_cli::{Language, Size};
-use crate::font::load_fonts;
-use crate::utils::{MERGE, WHISPER};
+use eframe::Frame;
+use egui::{ComboBox, Context, ProgressBar};
 
-#[derive(Clone)]
-pub struct Conv {
-    pub rt: Arc<Runtime>,
-    pub files: Arc<Mutex<Files>>,
-    pub config: Config,
-}
-
-#[derive(Clone)]
-pub struct Config {
-    pub lang: Language,
-    pub size: Size,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Files {
-    pub audio: Option<PathBuf>,
-    pub image: Option<PathBuf>,
-    pub subtitle: Option<PathBuf>,
-}
-
-impl Conv {
-    pub fn new(cc: &CreationContext) -> Box<Self> {
-        load_fonts(&cc.egui_ctx);
-        let mut style = (*cc.egui_ctx.style()).clone();
-        style.text_styles = [
-            (Heading, FontId::new(30.0, Proportional)),
-            (Name("Heading2".into()), FontId::new(25.0, Proportional)),
-            (Name("Context".into()), FontId::new(23.0, Proportional)),
-            (Body, FontId::new(18.0, Proportional)),
-            (Monospace, FontId::new(14.0, Proportional)),
-            (Button, FontId::new(14.0, Proportional)),
-            (Small, FontId::new(10.0, Proportional)),
-        ]
-            .into();
-        cc.egui_ctx.set_style(style);
-
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        Box::new(Self {
-            rt: Arc::new(rt),
-            files: Default::default(),
-            config: Config { lang: Language::Auto, size: Size::Medium },
-        })
-    }
-}
+use crate::config::{DOWNLOADED, FILE_SIZE, Language, Model};
+use crate::conv::Conv;
+use crate::utils::{DOWNLOADING, MERGE, WHISPER};
 
 impl eframe::App for Conv {
     fn update(&mut self, ctx: &Context, _: &mut Frame) {
@@ -103,19 +51,35 @@ impl eframe::App for Conv {
                         ui.selectable_value(&mut self.config.lang, *i, <&str>::from(*i));
                     }
                 });
-            ComboBox::from_label("模型")
-                .selected_text(format!("{}", self.config.size))
-                .show_ui(ui, |ui| {
-                    ui.style_mut().wrap = Some(false);
-                    for i in Size::value_variants() {
-                        ui.selectable_value(&mut self.config.size, *i, format!("{}", *i));
-                    }
-                });
+            ui.horizontal(|ui| {
+                ComboBox::from_label("模型")
+                    .selected_text(format!("{}", self.config.model))
+                    .show_ui(ui, |ui| {
+                        ui.style_mut().wrap = Some(false);
+                        for i in Model::value_variants() {
+                            ui.selectable_value(&mut self.config.model, *i, format!("{}", *i));
+                        }
+                    });
+                if ui.button("下载模型").clicked() {
+                    DOWNLOADING.store(false, Ordering::Relaxed);
+                    let model = self.config.model;
+                    if std::fs::remove_file(model.get_path()).is_err() {}
+                    self.rt.spawn(async move {
+                        if model.download().await.is_err() {
+                            DOWNLOADING.store(false, Ordering::Relaxed);
+                        }
+                    });
+                }
+            });
 
             if ui.button("音频 -> 字幕").clicked() {
-                if !WHISPER.load(Ordering::Relaxed) {
+                if !WHISPER.load(Ordering::Relaxed) && !DOWNLOADING.load(Ordering::Relaxed) {
                     self.whisper();
                 }
+            }
+            if DOWNLOADING.load(Ordering::Relaxed) {
+                ui.label("下载模型中");
+                ui.add(ProgressBar::new(DOWNLOADED.load(Ordering::Relaxed) as f32 / FILE_SIZE.load(Ordering::Relaxed) as f32).desired_width(200.0));
             }
             ui.label(if WHISPER.load(Ordering::Relaxed) { "转换中" } else { "转换结束" });
 
