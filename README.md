@@ -20,9 +20,12 @@ scoop install ffmpeg
 安装
 [CMake](https://cmake.org/download/)
 
+
 [Rustup](https://rustup.rs/)
 
+
 [LLVM](https://releases.llvm.org/download.html)
+
 
 [C++ 构建工具](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 
