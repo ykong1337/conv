@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::Ordering;
-use std::thread;
 use clap_builder::ValueEnum;
 use eframe::{CreationContext, Frame};
 use egui::{ComboBox, Context, FontId};
@@ -33,7 +32,7 @@ pub struct Files {
 }
 
 impl Conv {
-    pub fn new(cc: &CreationContext) -> Self {
+    pub fn new(cc: &CreationContext) -> Box<Self> {
         load_fonts(&cc.egui_ctx);
         let mut style = (*cc.egui_ctx.style()).clone();
         style.text_styles = [
@@ -52,15 +51,16 @@ impl Conv {
             .enable_all()
             .build()
             .unwrap();
-        Self {
+
+        Box::new(Self {
             rt: Arc::new(rt),
             files: Default::default(),
             config: Config { lang: Language::Auto, size: Size::Medium },
-        }
+        })
     }
 
-    fn open_audio(files: Arc<Mutex<Files>>) {
-        thread::spawn(move || {
+    fn open_audio(&self, files: Arc<Mutex<Files>>) {
+        self.rt.spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Audio File", &["mp3", "wav"])
                 .pick_file() {
@@ -69,8 +69,8 @@ impl Conv {
         });
     }
 
-    fn open_image(files: Arc<Mutex<Files>>) {
-        thread::spawn(move || {
+    fn open_image(&self, files: Arc<Mutex<Files>>) {
+        self.rt.spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Image File", &["jpg", "png"])
                 .pick_file() {
@@ -79,8 +79,8 @@ impl Conv {
         });
     }
 
-    fn open_subtitle(files: Arc<Mutex<Files>>) {
-        thread::spawn(move || {
+    fn open_subtitle(&self, files: Arc<Mutex<Files>>) {
+        self.rt.spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Subtitle File", &["srt", "lrc", "vtt"])
                 .pick_file() {
@@ -96,7 +96,7 @@ impl eframe::App for Conv {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             if ui.button("选择音频").clicked() {
-                Conv::open_audio(self.files.clone());
+                self.open_audio(self.files.clone());
             }
             ui.label(format!("音频: {}", if let Some(ref p) = self.files.lock().unwrap().audio {
                 p.to_str().unwrap()
@@ -105,7 +105,7 @@ impl eframe::App for Conv {
             }));
 
             if ui.button("选择背景图片").clicked() {
-                Conv::open_image(self.files.clone());
+                self.open_image(self.files.clone());
             }
             ui.label(format!("背景图片: {}", if let Some(ref p) = self.files.lock().unwrap().image {
                 p.to_str().unwrap()
@@ -114,7 +114,7 @@ impl eframe::App for Conv {
             }));
 
             if ui.button("选择字幕").clicked() {
-                Conv::open_subtitle(self.files.clone());
+                self.open_subtitle(self.files.clone());
             }
             ui.label(format!("字幕: {}", if let Some(ref p) = self.files.lock().unwrap().subtitle {
                 p.to_str().unwrap()

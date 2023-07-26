@@ -1,5 +1,5 @@
 use std::{fs::File, io::Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -55,26 +55,28 @@ pub fn ffmpeg_merge(rt: Arc<Runtime>, audio: Option<PathBuf>, image: Option<Path
         MERGE.store(true, Ordering::Relaxed);
         if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
             let current = std::env::current_dir().unwrap();
-            let subtitle_name = subtitle
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap();
-            if !current.join(subtitle_name).exists() {
-                std::fs::copy(subtitle, current.join(subtitle_name)).unwrap();
+            let subtitle_cache = Path::new("temp").with_extension(subtitle.extension().unwrap());
+            if !current.join(&subtitle_cache).exists() {
+                std::fs::copy(subtitle, current.join(&subtitle_cache)).unwrap();
             }
             let output = audio.with_extension("mp4");
 
-            if merge(
+            if let Ok(child) = merge(
                 audio.to_str().unwrap(),
                 image.to_str().unwrap(),
-                subtitle_name,
+                subtitle_cache.to_str().unwrap(),
                 output.to_str().unwrap(),
-            ).wait().is_err() {
+            ).as_mut() {
+                if child.wait().is_err() {
+                    MERGE.store(false, Ordering::Relaxed);
+                    return;
+                }
+            } else {
                 MERGE.store(false, Ordering::Relaxed);
                 return;
             }
-            if std::fs::remove_file(current.join(subtitle_name)).is_err() {
+            if std::fs::remove_file(current.join(subtitle_cache)).is_err() {
+                MERGE.store(false, Ordering::Relaxed);
                 return;
             }
         } else {
@@ -86,7 +88,7 @@ pub fn ffmpeg_merge(rt: Arc<Runtime>, audio: Option<PathBuf>, image: Option<Path
     });
 }
 
-fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> Child {
+fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io::Result<Child> {
     Command::new("ffmpeg")
         .args([
             "-y",
@@ -112,5 +114,4 @@ fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> Child {
             output,
         ])
         .spawn()
-        .unwrap()
 }

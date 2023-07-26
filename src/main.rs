@@ -21,6 +21,6 @@ fn run() {
         resizable: false,
         ..NativeOptions::default()
     };
-    eframe::run_native("Conv", option, Box::new(|cc| Box::new(Conv::new(cc))))
+    eframe::run_native("Conv", option, Box::new(|cc| Conv::new(cc)))
         .unwrap();
 }
