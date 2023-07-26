@@ -162,11 +162,11 @@ impl Transcript {
                         &format!(
                             "{i}\n{:02}:{:02}:{:02},{:03} --> {:02}:{:02}:{:02},{:03}\n{}\n\n",
                             fragment.start / 100 / 3600,
-                            fragment.start / 100 / 60,
+                            fragment.start / 100 % 3600 / 60,
                             fragment.start / 100 % 60,
                             fragment.start * 10 % 1000,
                             fragment.end / 100 / 3600,
-                            fragment.end / 100 / 60,
+                            fragment.end / 100 % 3600 / 60,
                             fragment.end / 100 % 60,
                             fragment.end * 10 % 1000,
                             fragment.text.trim()
