@@ -1,11 +1,13 @@
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::time::{Duration, Instant};
+
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
+
 use crate::config::{Language, Model};
-use crate::ffmpeg_decoder;
+use crate::utils;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Transcript {
@@ -46,7 +48,7 @@ impl Whisper {
         params.set_token_timestamps(word_timestamps);
         params.set_language(Some(<&str>::from(self.lang)));
 
-        let audio = ffmpeg_decoder::read_file(audio)?;
+        let audio = utils::read_file(audio)?;
 
         let st = Instant::now();
         let mut state = self.ctx.create_state().expect("failed to create state");

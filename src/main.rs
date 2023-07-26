@@ -11,7 +11,6 @@ mod utils;
 mod whisper;
 mod config;
 mod conv;
-mod ffmpeg_decoder;
 
 fn main() {
     run();
