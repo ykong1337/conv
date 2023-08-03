@@ -11,7 +11,7 @@ eframe = "0.22"
 egui = "0.22"
 font-kit = "0.11"
 clap_builder = "4"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 reqwest = "0.11"
