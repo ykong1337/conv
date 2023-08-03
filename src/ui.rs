@@ -64,7 +64,7 @@ impl eframe::App for Conv {
                     DOWNLOADING.store(false, Ordering::Relaxed);
                     let model = self.config.model;
                     if std::fs::remove_file(model.get_path()).is_err() {}
-                    self.rt.spawn(async move {
+                    tokio::spawn(async move {
                         if model.download().await.is_err() {
                             DOWNLOADING.store(false, Ordering::Relaxed);
                         }

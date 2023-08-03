@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 
 use eframe::NativeOptions;
 use egui::Vec2;
@@ -25,6 +25,8 @@ fn run() {
         resizable: false,
         ..NativeOptions::default()
     };
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let _rt = rt.enter();
     eframe::run_native("Conv", option, Box::new(|cc| Conv::new(cc)))
         .unwrap();
 }

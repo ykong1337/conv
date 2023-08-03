@@ -6,7 +6,6 @@ use eframe::CreationContext;
 use egui::FontFamily::Proportional;
 use egui::FontId;
 use egui::TextStyle::{Body, Button, Heading, Monospace, Name, Small};
-use tokio::runtime::Runtime;
 
 use crate::config::{Language, Model};
 use crate::font::load_fonts;
@@ -15,7 +14,6 @@ use crate::whisper::{Format, Whisper};
 
 #[derive(Clone)]
 pub struct Conv {
-    pub rt: Arc<Runtime>,
     pub files: Arc<Mutex<Files>>,
     pub config: Config,
 }
@@ -50,14 +48,13 @@ impl Conv {
         cc.egui_ctx.set_style(style);
 
         Box::new(Self {
-            rt: Arc::new(Runtime::new().unwrap()),
             files: Default::default(),
             config: Config { lang: Language::Auto, model: Model::Medium },
         })
     }
 
     pub fn open_audio(&self, files: Arc<Mutex<Files>>) {
-        self.rt.spawn(async move {
+        tokio::spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Audio File", &["mp3", "wav"])
                 .pick_file() {
@@ -67,7 +64,7 @@ impl Conv {
     }
 
     pub fn open_image(&self, files: Arc<Mutex<Files>>) {
-        self.rt.spawn(async move {
+        tokio::spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Image File", &["jpg", "png"])
                 .pick_file() {
@@ -77,7 +74,7 @@ impl Conv {
     }
 
     pub fn open_subtitle(&self, files: Arc<Mutex<Files>>) {
-        self.rt.spawn(async move {
+        tokio::spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Subtitle File", &["srt", "lrc", "vtt"])
                 .pick_file() {
@@ -91,7 +88,7 @@ impl Conv {
         let audio = file.audio.clone();
         let model = self.config.model;
         let lang = self.config.lang;
-        self.rt.spawn(async move {
+        tokio::spawn(async move {
             if let Some(ref audio) = audio {
                 if let Ok(ref mut w) = Whisper::new(lang, model).await {
                     WHISPER.store(true, Ordering::Relaxed);
@@ -112,7 +109,7 @@ impl Conv {
         let image = file.image.clone();
         let audio = file.audio.clone();
         let subtitle = file.subtitle.clone();
-        self.rt.spawn(async move {
+        tokio::spawn(async move {
             MERGE.store(true, Ordering::Relaxed);
             if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle) {
                 let current = std::env::current_dir().unwrap();
