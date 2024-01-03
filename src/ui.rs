@@ -17,7 +17,7 @@ impl eframe::App for Conv {
                 self.open_audio(self.files.clone());
             }
             ui.label(format!("音频: {}", if let Some(ref p) = self.files.lock().unwrap().audio {
-                p.to_str().unwrap()
+                p.file_name().unwrap().to_str().unwrap()
             } else {
                 "None"
             }));
@@ -26,7 +26,7 @@ impl eframe::App for Conv {
                 self.open_image(self.files.clone());
             }
             ui.label(format!("背景图片: {}", if let Some(ref p) = self.files.lock().unwrap().image {
-                p.to_str().unwrap()
+                p.file_name().unwrap().to_str().unwrap()
             } else {
                 "None"
             }));
@@ -35,10 +35,20 @@ impl eframe::App for Conv {
                 self.open_subtitle(self.files.clone());
             }
             ui.label(format!("字幕: {}", if let Some(ref p) = self.files.lock().unwrap().subtitle {
-                p.to_str().unwrap()
+                p.file_name().unwrap().to_str().unwrap()
             } else {
                 "None"
             }));
+
+
+            ui.separator();
+
+            if ui.button("合并音频/图片/字幕").clicked() {
+                if !MERGE.load(Ordering::Relaxed) {
+                    self.ffmpeg_merge();
+                }
+            }
+            ui.label(if MERGE.load(Ordering::Relaxed) { "合并中" } else { "合并结束" });
 
             ui.separator();
 
@@ -84,15 +94,6 @@ impl eframe::App for Conv {
                 });
             }
             ui.label(if WHISPER.load(Ordering::Relaxed) { "转换中" } else { "转换结束" });
-
-            ui.separator();
-
-            if ui.button("合并音频/图片/字幕").clicked() {
-                if !MERGE.load(Ordering::Relaxed) {
-                    self.ffmpeg_merge();
-                }
-            }
-            ui.label(if MERGE.load(Ordering::Relaxed) { "合并中" } else { "合并结束" });
         });
     }
 }

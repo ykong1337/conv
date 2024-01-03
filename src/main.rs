@@ -20,7 +20,7 @@ async fn main() {
 async fn run() {
     let option = NativeOptions {
         icon_data: None,
-        initial_window_size: Some(Vec2::new(400.0, 400.0)),
+        initial_window_size: Some(Vec2::new(400.0, 500.0)),
         follow_system_theme: true,
         centered: true,
         resizable: false,
