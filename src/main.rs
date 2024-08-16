@@ -5,12 +5,10 @@ use egui::{Vec2, ViewportBuilder};
 
 use crate::conv::Conv;
 
-mod ui;
-mod font;
-mod utils;
-mod whisper;
-mod config;
 mod conv;
+mod font;
+mod ui;
+mod utils;
 
 #[tokio::main]
 async fn main() {
@@ -29,6 +27,5 @@ async fn run() {
         viewport,
         ..NativeOptions::default()
     };
-    eframe::run_native("Conv", option, Box::new(|cc| Conv::new(cc)))
-        .unwrap();
+    eframe::run_native("Conv", option, Box::new(|cc| Conv::new(cc))).unwrap();
 }
