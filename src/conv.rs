@@ -1,25 +1,26 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use eframe::CreationContext;
 use egui::FontFamily::Proportional;
 use egui::FontId;
 use egui::TextStyle::{Body, Button, Heading, Monospace, Name, Small};
+use parking_lot::RwLock;
 
 use crate::font::load_fonts;
 use crate::utils::{merge, MERGE};
 
 #[derive(Clone)]
 pub struct Conv {
-    pub files: Arc<Mutex<Files>>,
+    pub files: Arc<RwLock<Files>>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Files {
-    pub audio: Option<PathBuf>,
+    pub audio: Vec<PathBuf>,
     pub image: Option<PathBuf>,
-    pub subtitle: Option<PathBuf>,
+    pub subtitle: Vec<PathBuf>,
 }
 
 impl Conv {
@@ -43,70 +44,73 @@ impl Conv {
         })
     }
 
-    pub fn open_audio(&self, files: Arc<Mutex<Files>>) {
+    pub fn open_audio(&self, files: Arc<RwLock<Files>>) {
         tokio::spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Audio File", &["mp3", "wav"])
-                .pick_file()
+                .pick_files()
             {
-                files.lock().unwrap().audio = Some(path);
+                files.write().audio = path;
             }
         });
     }
 
-    pub fn open_image(&self, files: Arc<Mutex<Files>>) {
+    pub fn open_image(&self, files: Arc<RwLock<Files>>) {
         tokio::spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Image File", &["jpg", "png"])
                 .pick_file()
             {
-                files.lock().unwrap().image = Some(path);
+                files.write().image = Some(path);
             }
         });
     }
 
-    pub fn open_subtitle(&self, files: Arc<Mutex<Files>>) {
+    pub fn open_subtitle(&self, files: Arc<RwLock<Files>>) {
         tokio::spawn(async move {
             if let Some(path) = rfd::FileDialog::new()
                 .add_filter("Subtitle File", &["srt", "lrc", "vtt"])
-                .pick_file()
+                .pick_files()
             {
-                files.lock().unwrap().subtitle = Some(path);
+                files.write().subtitle = path;
             }
         });
     }
 
     pub fn ffmpeg_merge(&self) {
-        let file = self.files.lock().unwrap();
+        let file = self.files.read();
         let image = file.image.clone();
         let audio = file.audio.clone();
         let subtitle = file.subtitle.clone();
-        tokio::spawn(async move {
-            MERGE.store(true, Ordering::Relaxed);
-            if let (Some(ref image), Some(ref audio), Some(ref subtitle)) = (image, audio, subtitle)
-            {
-                let current = std::env::current_dir().unwrap();
-                let subtitle_cache = Path::new(&uuid::Uuid::new_v4().to_string())
-                    .with_extension(subtitle.extension().unwrap());
-                if !current.join(&subtitle_cache).exists() {
-                    std::fs::copy(subtitle, current.join(&subtitle_cache)).unwrap();
-                }
-                let output = audio.with_extension("mp4");
+        MERGE.store(true, Ordering::Relaxed);
 
-                let Ok(mut child) = merge(
-                    audio.to_str().unwrap(),
-                    image.to_str().unwrap(),
-                    subtitle_cache.to_str().unwrap(),
-                    output.to_str().unwrap(),
-                ) else {
-                    MERGE.store(false, Ordering::Relaxed);
-                    return;
-                };
-                child.wait().ok();
-                std::fs::remove_file(subtitle_cache).ok();
-                std::fs::remove_file("out.mp4").ok();
+        if let Some(ref image) = image {
+            for (audio, subtitle) in audio.into_iter().zip(subtitle) {
+                let image = image.to_string_lossy().to_string();
+                tokio::spawn(async move {
+                    let current = std::env::current_dir().unwrap();
+                    let subtitle_cache = Path::new(&uuid::Uuid::new_v4().to_string())
+                        .with_extension(subtitle.extension().unwrap());
+                    if !current.join(&subtitle_cache).exists() {
+                        std::fs::copy(subtitle, current.join(&subtitle_cache)).unwrap();
+                    }
+                    let output = audio.with_extension("mp4");
+
+                    let Ok(mut child) = merge(
+                        audio.to_str().unwrap(),
+                        image.as_str(),
+                        subtitle_cache.to_str().unwrap(),
+                        output.to_str().unwrap(),
+                    ) else {
+                        MERGE.store(false, Ordering::Relaxed);
+                        return;
+                    };
+                    child.wait().ok();
+                    std::fs::remove_file(subtitle_cache).ok();
+                    std::fs::remove_file("out.mp4").ok();
+                });
             }
-            MERGE.store(false, Ordering::Relaxed);
-        });
+        }
+        MERGE.store(false, Ordering::Relaxed);
     }
 }
