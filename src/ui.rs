@@ -48,10 +48,8 @@ impl eframe::App for Conv {
 
             ui.separator();
 
-            if ui.button("合并音频/图片/字幕").clicked() {
-                if !MERGE.load(Ordering::Relaxed) {
-                    self.ffmpeg_merge();
-                }
+            if ui.button("合并音频/图片/字幕").clicked() && !MERGE.load(Ordering::Relaxed) {
+                self.ffmpeg_merge();
             }
             ui.label(if MERGE.load(Ordering::Relaxed) {
                 format!(
