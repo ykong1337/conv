@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use eframe::CreationContext;
@@ -10,6 +10,9 @@ use parking_lot::RwLock;
 
 use crate::font::load_fonts;
 use crate::utils::{merge, MERGE};
+
+pub static COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static NUM: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Clone)]
 pub struct Conv {
@@ -82,12 +85,15 @@ impl Conv {
         let image = file.image.clone();
         let audio = file.audio.clone();
         let subtitle = file.subtitle.clone();
+        let resources = audio.into_iter().zip(subtitle);
         MERGE.store(true, Ordering::Relaxed);
+        NUM.store(resources.len(), Ordering::Release);
 
-        if let Some(ref image) = image {
-            for (audio, subtitle) in audio.into_iter().zip(subtitle) {
-                let image = image.to_string_lossy().to_string();
-                tokio::spawn(async move {
+        tokio::spawn(async move {
+            if let Some(ref image) = image {
+                for (audio, subtitle) in resources {
+                    COUNT.fetch_add(1, Ordering::AcqRel);
+                    let image = image.to_string_lossy().to_string();
                     let current = std::env::current_dir().unwrap();
                     let subtitle_cache = Path::new(&uuid::Uuid::new_v4().to_string())
                         .with_extension(subtitle.extension().unwrap());
@@ -108,9 +114,11 @@ impl Conv {
                     child.wait().ok();
                     std::fs::remove_file(subtitle_cache).ok();
                     std::fs::remove_file("out.mp4").ok();
-                });
+                }
             }
-        }
-        MERGE.store(false, Ordering::Relaxed);
+            MERGE.store(false, Ordering::Relaxed);
+            COUNT.store(0, Ordering::Release);
+            NUM.store(0, Ordering::Release);
+        });
     }
 }

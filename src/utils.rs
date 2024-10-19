@@ -31,6 +31,7 @@ pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io:
         .ok();
     Command::new("ffmpeg")
         .args([
+            "-y",
             "-i",
             "out.mp4",
             "-vf",

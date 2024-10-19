@@ -27,5 +27,5 @@ async fn run() {
         viewport,
         ..NativeOptions::default()
     };
-    eframe::run_native("Conv", option, Box::new(|cc| Conv::new(cc))).unwrap();
+    eframe::run_native("Conv", option, Box::new(|cc| Ok(Conv::new(cc)))).ok();
 }

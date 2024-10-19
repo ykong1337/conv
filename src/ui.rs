@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering;
 use eframe::Frame;
 use egui::Context;
 
-use crate::conv::Conv;
+use crate::conv::{Conv, COUNT, NUM};
 use crate::utils::MERGE;
 
 impl eframe::App for Conv {
@@ -54,9 +54,13 @@ impl eframe::App for Conv {
                 }
             }
             ui.label(if MERGE.load(Ordering::Relaxed) {
-                "合并中"
+                format!(
+                    "合并中 {}/{}",
+                    COUNT.load(Ordering::Acquire),
+                    NUM.load(Ordering::Acquire)
+                )
             } else {
-                "合并结束"
+                "合并结束".to_string()
             });
         });
     }
