@@ -9,6 +9,7 @@ mod conv;
 mod font;
 mod ui;
 mod utils;
+mod whisper;
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +26,7 @@ async fn run() {
 
     let option = NativeOptions {
         viewport,
-        ..NativeOptions::default()
+        ..Default::default()
     };
     eframe::run_native("Conv", option, Box::new(|cc| Ok(Conv::new(cc)))).ok();
 }

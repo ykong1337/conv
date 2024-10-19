@@ -1,9 +1,7 @@
-use std::sync::atomic::Ordering;
-
 use eframe::Frame;
 use egui::Context;
 
-use crate::conv::{Conv, COUNT, NUM};
+use crate::conv::{Conv, ALL, COUNT};
 use crate::utils::MERGE;
 
 impl eframe::App for Conv {
@@ -48,15 +46,16 @@ impl eframe::App for Conv {
 
             ui.separator();
 
-            if ui.button("合并音频/图片/字幕").clicked() && !MERGE.load(Ordering::Relaxed) {
-                self.ffmpeg_merge();
-            }
-            ui.label(if MERGE.load(Ordering::Relaxed) {
-                format!(
-                    "合并中 {}/{}",
-                    COUNT.load(Ordering::Acquire),
-                    NUM.load(Ordering::Acquire)
-                )
+            ui.horizontal(|ui| {
+                if ui.button("合并音频/图片/字幕").clicked() && !MERGE.load() {
+                    self.ffmpeg_merge();
+                }
+                if ui.button("停止").clicked() {
+                    MERGE.store(false);
+                }
+            });
+            ui.label(if MERGE.load() {
+                format!("合并中 {}/{}", COUNT.load(), ALL.load())
             } else {
                 "合并结束".to_string()
             });

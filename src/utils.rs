@@ -1,10 +1,10 @@
-use std::process::{Child, Command};
-use std::sync::atomic::AtomicBool;
+use crossbeam::atomic::AtomicCell;
+use std::process::Command;
 
-pub static MERGE: AtomicBool = AtomicBool::new(false);
+pub static MERGE: AtomicCell<bool> = AtomicCell::new(false);
 
 #[inline]
-pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io::Result<Child> {
+pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> anyhow::Result<()> {
     Command::new("ffmpeg")
         .args([
             "-y",
@@ -16,10 +16,6 @@ pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io:
             image,
             "-i",
             audio,
-            "-c:v",
-            "libx264",
-            "-c:a",
-            "aac",
             "-pix_fmt",
             "yuv420p",
             "-vf",
@@ -27,8 +23,8 @@ pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io:
             "-shortest",
             "out.mp4",
         ])
-        .status()
-        .ok();
+        .status()?;
+
     Command::new("ffmpeg")
         .args([
             "-y",
@@ -38,5 +34,7 @@ pub fn merge(audio: &str, image: &str, subtitle: &str, output: &str) -> std::io:
             &format!("subtitles={}", subtitle),
             output,
         ])
-        .spawn()
+        .status()?;
+
+    Ok(())
 }
