@@ -4,7 +4,7 @@ use std::sync::{Arc, LazyLock};
 use crate::font::load_fonts;
 use crate::utils::{merge, MERGE};
 use crossbeam::atomic::AtomicCell;
-use eframe::CreationContext;
+use eframe::{egui, CreationContext};
 use egui::FontFamily::Proportional;
 use egui::FontId;
 use egui::TextStyle::{Body, Button, Heading, Monospace, Name, Small};

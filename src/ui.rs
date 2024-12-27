@@ -1,4 +1,4 @@
-use eframe::Frame;
+use eframe::{egui, Frame};
 use egui::Context;
 
 use crate::conv::{Conv, ALL, COUNT};

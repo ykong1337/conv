@@ -1,6 +1,6 @@
 #![windows_subsystem = "windows"]
 
-use eframe::NativeOptions;
+use eframe::{egui, NativeOptions};
 use egui::{Vec2, ViewportBuilder};
 
 use crate::conv::Conv;
